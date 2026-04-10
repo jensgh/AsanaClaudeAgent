@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+state.json
+locks/
+state/
+appsettings.Development.json
+.env
