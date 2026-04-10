@@ -47,7 +47,10 @@ public partial class TaskOrchestrator : ITaskOrchestrator
 
         foreach (var task in tasks)
         {
-            if (ct.IsCancellationRequested) break;
+            if (ct.IsCancellationRequested)
+            {
+                break;
+            }
 
             if (ShouldSkipTask(appState, task.Gid))
             {
@@ -76,28 +79,21 @@ public partial class TaskOrchestrator : ITaskOrchestrator
 
         try
         {
-            // Fetch full task details (list endpoint may not include notes)
+            // List endpoint already includes notes via opt_fields, but fetch full details
+            // to guarantee we have the complete description
             var fullTask = await _asana.GetTaskAsync(task.Gid, ct);
 
-            // Classify
-            UpdateTaskState(appState, fullTask, "classifying");
-            await _state.SaveAsync(appState, ct);
+            UpdateTaskState(appState, fullTask, AgentTaskStatus.Classifying);
 
             var classification = await _classifier.ClassifyAsync(fullTask, ct);
 
             if (!classification.CanWork)
             {
                 _logger.LogInformation("Task {Gid} classified as not workable: {Reason}", task.Gid, classification.Reason);
-                UpdateTaskState(appState, fullTask, "skipped", failureReason: classification.Reason);
+                UpdateTaskState(appState, fullTask, AgentTaskStatus.Skipped, failureReason: classification.Reason);
                 await _state.SaveAsync(appState, ct);
-
-                if (_appSettings.CommentOnAsana)
-                {
-                    await _asana.PostCommentAsync(task.Gid,
-                        $"[Claude Code Agent] Evaluated this task and determined it cannot be automated at this time.\n\nReason: {classification.Reason}",
-                        ct);
-                }
-
+                await CommentOnTaskAsync(task.Gid,
+                    $"Evaluated this task and determined it cannot be automated at this time.\n\nReason: {classification.Reason}", ct);
                 return;
             }
 
@@ -105,17 +101,16 @@ public partial class TaskOrchestrator : ITaskOrchestrator
             {
                 _logger.LogInformation("DRY RUN: Would work on task {Gid} — {Summary} (complexity: {Complexity})",
                     task.Gid, classification.Summary, classification.EstimatedComplexity);
-                UpdateTaskState(appState, fullTask, "skipped", failureReason: "Dry run");
+                UpdateTaskState(appState, fullTask, AgentTaskStatus.Skipped, failureReason: "Dry run");
                 await _state.SaveAsync(appState, ct);
                 return;
             }
 
-            // Create branch and start work
             var branchName = GenerateBranchName(fullTask);
             await _git.EnsureCleanWorkingTreeAsync(ct);
             await _git.CreateBranchAsync(branchName, ct);
 
-            UpdateTaskState(appState, fullTask, "working", branchName: branchName);
+            UpdateTaskState(appState, fullTask, AgentTaskStatus.Working, branchName: branchName);
             await _state.SaveAsync(appState, ct);
 
             var workResult = await _worker.ExecuteAsync(fullTask, classification, branchName, ct);
@@ -123,51 +118,36 @@ public partial class TaskOrchestrator : ITaskOrchestrator
             if (workResult.Success)
             {
                 _logger.LogInformation("Task {Gid} completed. PR: {PrUrl}", task.Gid, workResult.PrUrl);
-                UpdateTaskState(appState, fullTask, "completed", branchName: branchName, prUrl: workResult.PrUrl);
-
-                if (_appSettings.CommentOnAsana)
-                {
-                    await _asana.PostCommentAsync(task.Gid,
-                        $"[Claude Code Agent] Created a PR for this task: {workResult.PrUrl}",
-                        ct);
-                }
-
-                // Return to master after successful work
+                UpdateTaskState(appState, fullTask, AgentTaskStatus.Completed, branchName: branchName, prUrl: workResult.PrUrl);
+                await CommentOnTaskAsync(task.Gid, $"Created a PR for this task: {workResult.PrUrl}", ct);
                 await _git.CheckoutAsync("master", ct);
+                await _state.SaveAsync(appState, ct);
+                return;
+            }
+
+            _logger.LogWarning("Task {Gid} failed: {Error}", task.Gid, workResult.ErrorMessage);
+            var taskState = appState.Tasks.GetValueOrDefault(task.Gid);
+            var retryCount = (taskState?.RetryCount ?? 0) + 1;
+
+            if (retryCount <= _appSettings.MaxRetries)
+            {
+                UpdateTaskState(appState, fullTask, AgentTaskStatus.Pending, failureReason: workResult.ErrorMessage);
+                appState.Tasks[task.Gid].RetryCount = retryCount;
             }
             else
             {
-                _logger.LogWarning("Task {Gid} failed: {Error}", task.Gid, workResult.ErrorMessage);
-                var taskState = appState.Tasks.GetValueOrDefault(task.Gid);
-                var retryCount = (taskState?.RetryCount ?? 0) + 1;
-
-                if (retryCount <= _appSettings.MaxRetries)
-                {
-                    UpdateTaskState(appState, fullTask, "pending", failureReason: workResult.ErrorMessage);
-                    appState.Tasks[task.Gid].RetryCount = retryCount;
-                }
-                else
-                {
-                    UpdateTaskState(appState, fullTask, "failed", branchName: branchName, failureReason: workResult.ErrorMessage);
-
-                    if (_appSettings.CommentOnAsana)
-                    {
-                        await _asana.PostCommentAsync(task.Gid,
-                            $"[Claude Code Agent] Attempted to work on this task but failed.\n\nError: {workResult.ErrorMessage}",
-                            ct);
-                    }
-                }
-
-                // Cleanup: go back to master and delete failed branch
-                await _git.DeleteLocalBranchAsync(branchName, ct);
+                UpdateTaskState(appState, fullTask, AgentTaskStatus.Failed, branchName: branchName, failureReason: workResult.ErrorMessage);
+                await CommentOnTaskAsync(task.Gid,
+                    $"Attempted to work on this task but failed.\n\nError: {workResult.ErrorMessage}", ct);
             }
 
+            await _git.DeleteLocalBranchAsync(branchName, ct);
             await _state.SaveAsync(appState, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error processing task {Gid}", task.Gid);
-            UpdateTaskState(appState, task, "failed", failureReason: ex.Message);
+            UpdateTaskState(appState, task, AgentTaskStatus.Failed, failureReason: ex.Message);
             await _state.SaveAsync(appState, ct);
         }
         finally
@@ -176,12 +156,24 @@ public partial class TaskOrchestrator : ITaskOrchestrator
         }
     }
 
+    private async Task CommentOnTaskAsync(string gid, string message, CancellationToken ct)
+    {
+        if (!_appSettings.CommentOnAsana)
+        {
+            return;
+        }
+
+        await _asana.PostCommentAsync(gid, $"[Claude Code Agent] {message}", ct);
+    }
+
     private static bool ShouldSkipTask(AppState appState, string gid)
     {
         if (!appState.Tasks.TryGetValue(gid, out var taskState))
+        {
             return false;
+        }
 
-        return taskState.Status is "completed" or "skipped" or "working";
+        return taskState.Status is AgentTaskStatus.Completed or AgentTaskStatus.Skipped or AgentTaskStatus.Working;
     }
 
     private static void UpdateTaskState(
@@ -202,16 +194,31 @@ public partial class TaskOrchestrator : ITaskOrchestrator
         state.Status = status;
         state.LastUpdatedUtc = DateTime.UtcNow;
 
-        if (branchName is not null) state.BranchName = branchName;
-        if (prUrl is not null) state.PrUrl = prUrl;
-        if (failureReason is not null) state.FailureReason = failureReason;
+        if (branchName is not null)
+        {
+            state.BranchName = branchName;
+        }
+
+        if (prUrl is not null)
+        {
+            state.PrUrl = prUrl;
+        }
+
+        if (failureReason is not null)
+        {
+            state.FailureReason = failureReason;
+        }
     }
 
     private static string GenerateBranchName(AsanaTask task)
     {
         var slug = SlugRegex().Replace(task.Name.ToLowerInvariant(), "-");
         slug = MultiDashRegex().Replace(slug, "-").Trim('-');
-        if (slug.Length > 40) slug = slug[..40].TrimEnd('-');
+        if (slug.Length > 40)
+        {
+            slug = slug[..40].TrimEnd('-');
+        }
+
         return $"claude/asana-{task.Gid}-{slug}";
     }
 

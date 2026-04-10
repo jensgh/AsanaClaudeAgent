@@ -12,26 +12,6 @@ public class ClassifierService : IClassifierService
     private readonly ClaudeSettings _settings;
     private readonly ILogger<ClassifierService> _logger;
 
-    private const string ClassificationPrompt = """
-        You are evaluating whether an Asana task can be implemented by an AI coding agent (Claude Code) working on a large travel marketplace monorepo.
-
-        Task: {0}
-        Description:
-        {1}
-        Link: {2}
-
-        Assess whether this task:
-        1. Is a code change that can be implemented by reading the task description alone (no ambiguous requirements, no need for human design decisions)
-        2. Is scoped enough to be done in a single PR
-        3. Does not require access to external systems, credentials, or manual testing steps that cannot be automated
-        4. Has enough detail to implement without further clarification
-
-        Respond ONLY with valid JSON matching this exact schema:
-        {{"can_work": bool, "reason": "string", "summary": "string", "estimated_complexity": "low|medium|high"}}
-
-        Be conservative — if in doubt, set can_work to false.
-        """;
-
     public ClassifierService(
         IClaudeProcessRunner runner,
         IOptions<ClaudeSettings> settings,
@@ -44,7 +24,7 @@ public class ClassifierService : IClassifierService
 
     public async Task<ClassificationResult> ClassifyAsync(AsanaTask task, CancellationToken ct)
     {
-        var prompt = string.Format(ClassificationPrompt, task.Name, task.Notes, task.PermalinkUrl);
+        var prompt = BuildPrompt(task);
 
         var result = await _runner.RunAsync(new ClaudeProcessOptions
         {
@@ -72,7 +52,9 @@ public class ClassifierService : IClassifierService
         {
             var classification = JsonSerializer.Deserialize<ClassificationResult>(result.Stdout);
             if (classification is null)
+            {
                 throw new JsonException("Deserialized to null");
+            }
 
             _logger.LogInformation("Task {Gid} ({Name}): canWork={CanWork}, complexity={Complexity}, reason={Reason}",
                 task.Gid, task.Name, classification.CanWork, classification.EstimatedComplexity, classification.Reason);
@@ -91,4 +73,25 @@ public class ClassifierService : IClassifierService
             };
         }
     }
+
+    private static string BuildPrompt(AsanaTask task) =>
+        $$"""
+        You are evaluating whether an Asana task can be implemented by an AI coding agent (Claude Code) working on a large travel marketplace monorepo.
+
+        Task: {{task.Name}}
+        Description:
+        {{task.Notes}}
+        Link: {{task.PermalinkUrl}}
+
+        Assess whether this task:
+        1. Is a code change that can be implemented by reading the task description alone (no ambiguous requirements, no need for human design decisions)
+        2. Is scoped enough to be done in a single PR
+        3. Does not require access to external systems, credentials, or manual testing steps that cannot be automated
+        4. Has enough detail to implement without further clarification
+
+        Respond ONLY with valid JSON matching this exact schema:
+        {"can_work": bool, "reason": "string", "summary": "string", "estimated_complexity": "low|medium|high"}
+
+        Be conservative — if in doubt, set can_work to false.
+        """;
 }

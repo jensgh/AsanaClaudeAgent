@@ -21,14 +21,16 @@ public class StateService : IStateService
     public async Task<AppState> LoadAsync(CancellationToken ct)
     {
         var path = _settings.StateFilePath;
-        if (!File.Exists(path))
+        try
+        {
+            var json = await File.ReadAllTextAsync(path, ct);
+            return JsonSerializer.Deserialize<AppState>(json, JsonOptions) ?? new AppState();
+        }
+        catch (FileNotFoundException)
         {
             _logger.LogInformation("No state file found at {Path}, starting fresh", path);
             return new AppState();
         }
-
-        var json = await File.ReadAllTextAsync(path, ct);
-        return JsonSerializer.Deserialize<AppState>(json, JsonOptions) ?? new AppState();
     }
 
     public async Task SaveAsync(AppState state, CancellationToken ct)
@@ -42,27 +44,26 @@ public class StateService : IStateService
 
     public Task<bool> IsTaskLockedAsync(string gid, CancellationToken ct)
     {
-        var lockPath = Path.Combine(_settings.LocksDirectory, $"{gid}.lock");
-        return Task.FromResult(File.Exists(lockPath));
+        return Task.FromResult(File.Exists(GetLockPath(gid)));
     }
 
     public async Task LockTaskAsync(string gid, CancellationToken ct)
     {
         Directory.CreateDirectory(_settings.LocksDirectory);
-        var lockPath = Path.Combine(_settings.LocksDirectory, $"{gid}.lock");
         var content = JsonSerializer.Serialize(new
         {
             pid = Environment.ProcessId,
             startedUtc = DateTime.UtcNow
         });
-        await File.WriteAllTextAsync(lockPath, content, ct);
+        await File.WriteAllTextAsync(GetLockPath(gid), content, ct);
     }
 
     public Task UnlockTaskAsync(string gid, CancellationToken ct)
     {
-        var lockPath = Path.Combine(_settings.LocksDirectory, $"{gid}.lock");
-        if (File.Exists(lockPath))
-            File.Delete(lockPath);
+        File.Delete(GetLockPath(gid));
         return Task.CompletedTask;
     }
+
+    private string GetLockPath(string gid) =>
+        Path.Combine(_settings.LocksDirectory, $"{gid}.lock");
 }

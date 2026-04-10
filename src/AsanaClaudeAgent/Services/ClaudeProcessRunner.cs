@@ -1,27 +1,27 @@
 using System.Diagnostics;
+using AsanaClaudeAgent.Configuration;
 using AsanaClaudeAgent.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AsanaClaudeAgent.Services;
 
 public class ClaudeProcessRunner : IClaudeProcessRunner
 {
+    private readonly ClaudeSettings _settings;
     private readonly ILogger<ClaudeProcessRunner> _logger;
 
-    public ClaudeProcessRunner(ILogger<ClaudeProcessRunner> logger)
+    public ClaudeProcessRunner(IOptions<ClaudeSettings> settings, ILogger<ClaudeProcessRunner> logger)
     {
+        _settings = settings.Value;
         _logger = logger;
     }
 
     public async Task<ClaudeProcessResult> RunAsync(ClaudeProcessOptions options, CancellationToken ct)
     {
-        var args = BuildArguments(options);
-        _logger.LogInformation("Running: claude {Args} (timeout: {Timeout})", args, options.Timeout);
-
         var psi = new ProcessStartInfo
         {
-            FileName = options.WorkingDirectory.Contains("claude") ? "claude" : options.WorkingDirectory,
-            Arguments = args,
+            FileName = _settings.ClaudeBinaryPath,
             WorkingDirectory = options.WorkingDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -30,20 +30,24 @@ public class ClaudeProcessRunner : IClaudeProcessRunner
             CreateNoWindow = true
         };
 
-        // Fix: FileName should always be the claude binary
-        psi.FileName = "claude";
+        foreach (var arg in BuildArguments(options))
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        _logger.LogInformation("Running: {FileName} {Args} (timeout: {Timeout})",
+            psi.FileName, string.Join(' ', psi.ArgumentList), options.Timeout);
 
         using var process = Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start claude process");
 
-        // Pipe prompt via stdin to avoid shell escaping issues
         await process.StandardInput.WriteAsync(options.Prompt);
         process.StandardInput.Close();
 
-        // Read stdout and stderr concurrently to prevent deadlocks
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(options.Timeout);
 
+        // Read both streams concurrently to prevent pipe buffer deadlocks
         var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
         var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
 
@@ -55,7 +59,9 @@ public class ClaudeProcessRunner : IClaudeProcessRunner
 
             _logger.LogInformation("Claude exited with code {ExitCode}", process.ExitCode);
             if (!string.IsNullOrWhiteSpace(stderr))
+            {
                 _logger.LogDebug("Claude stderr: {Stderr}", stderr[..Math.Min(stderr.Length, 500)]);
+            }
 
             return new ClaudeProcessResult
             {
@@ -78,7 +84,7 @@ public class ClaudeProcessRunner : IClaudeProcessRunner
         }
     }
 
-    private static string BuildArguments(ClaudeProcessOptions options)
+    private static List<string> BuildArguments(ClaudeProcessOptions options)
     {
         var args = new List<string> { "--print", "--output-format", options.OutputFormat ?? "text" };
 
@@ -94,21 +100,23 @@ public class ClaudeProcessRunner : IClaudeProcessRunner
             args.Add(options.AllowedTools);
         }
 
-        if (options.MaxBudgetUsd.HasValue)
+        if (options.MaxCostUsd.HasValue)
         {
-            args.Add("--max-turns");
-            args.Add("100");
+            args.Add("--max-cost");
+            args.Add(options.MaxCostUsd.Value.ToString("F2"));
         }
 
         if (options.DangerouslySkipPermissions)
+        {
             args.Add("--dangerously-skip-permissions");
+        }
 
         if (options.AppendSystemPrompt is not null)
         {
             args.Add("--append-system-prompt");
-            args.Add($"\"{options.AppendSystemPrompt}\"");
+            args.Add(options.AppendSystemPrompt);
         }
 
-        return string.Join(' ', args);
+        return args;
     }
 }

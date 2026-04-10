@@ -20,8 +20,10 @@ public class GitService : IGitService
     {
         var result = await RunGitAsync("status --porcelain", ct);
         if (!string.IsNullOrWhiteSpace(result))
+        {
             throw new InvalidOperationException(
                 $"Monorepo working tree is not clean. Please commit or stash changes first.\n{result}");
+        }
     }
 
     public async Task<string> CreateBranchAsync(string branchName, CancellationToken ct)
@@ -67,12 +69,16 @@ public class GitService : IGitService
         using var process = Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start git process");
 
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
         await process.WaitForExitAsync(ct);
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
 
         if (process.ExitCode != 0)
+        {
             throw new InvalidOperationException($"git {arguments} failed (exit {process.ExitCode}): {stderr}");
+        }
 
         return stdout;
     }

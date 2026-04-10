@@ -28,30 +28,3 @@ public class AsanaTask
     [JsonPropertyName("projects")]
     public List<AsanaRef>? Projects { get; set; }
 }
-
-public class AsanaRef
-{
-    [JsonPropertyName("gid")]
-    public string Gid { get; set; } = "";
-
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-}
-
-public class AsanaTaskListResponse
-{
-    [JsonPropertyName("data")]
-    public List<AsanaTask> Data { get; set; } = [];
-
-    [JsonPropertyName("next_page")]
-    public AsanaNextPage? NextPage { get; set; }
-}
-
-public class AsanaNextPage
-{
-    [JsonPropertyName("offset")]
-    public string? Offset { get; set; }
-
-    [JsonPropertyName("uri")]
-    public string? Uri { get; set; }
-}

@@ -13,6 +13,8 @@ public class AsanaService : IAsanaService
     private readonly AsanaSettings _settings;
     private readonly ILogger<AsanaService> _logger;
 
+    private const string TaskOptFields = "gid,name,notes,completed,permalink_url,modified_at,assignee,projects.name";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
@@ -41,7 +43,9 @@ public class AsanaService : IAsanaService
 
             var result = await response.Content.ReadFromJsonAsync<AsanaTaskListResponse>(JsonOptions, ct);
             if (result?.Data is not null)
+            {
                 allTasks.AddRange(result.Data);
+            }
 
             url = result?.NextPage?.Uri;
         }
@@ -52,7 +56,7 @@ public class AsanaService : IAsanaService
 
     public async Task<AsanaTask> GetTaskAsync(string gid, CancellationToken ct)
     {
-        var url = $"tasks/{gid}?opt_fields=gid,name,notes,completed,permalink_url,modified_at,assignee,projects.name";
+        var url = $"tasks/{gid}?opt_fields={TaskOptFields}";
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
@@ -72,12 +76,11 @@ public class AsanaService : IAsanaService
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Failed to post comment on task {Gid}: {Error}", gid, error);
+            _logger.LogError("Failed to post comment on task {Gid}: {StatusCode} {Error}", gid, response.StatusCode, error);
+            return;
         }
-        else
-        {
-            _logger.LogInformation("Posted comment on Asana task {Gid}", gid);
-        }
+
+        _logger.LogInformation("Posted comment on Asana task {Gid}", gid);
     }
 
     private string BuildTaskListUrl(DateTime? modifiedSince)
@@ -85,10 +88,12 @@ public class AsanaService : IAsanaService
         var url = $"tasks?assignee={_settings.AssigneeGid}"
                   + $"&workspace={_settings.WorkspaceGid}"
                   + "&completed_since=now"
-                  + "&opt_fields=gid,name,notes,completed,permalink_url,modified_at,assignee,projects.name";
+                  + $"&opt_fields={TaskOptFields}";
 
         if (modifiedSince.HasValue)
+        {
             url += $"&modified_since={modifiedSince.Value:yyyy-MM-ddTHH:mm:ss.fffZ}";
+        }
 
         return url;
     }
