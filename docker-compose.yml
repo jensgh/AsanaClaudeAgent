@@ -6,7 +6,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GH_TOKEN=${GH_TOKEN}
       - Asana__WorkspaceGid=${ASANA_WORKSPACE_GID}
-      - Claude__MonorepoPath=/repo
+      - Claude__LocalRepoPath=/repo
       - Claude__DangerouslySkipPermissions=true
       - App__StateFilePath=/app/state/state.json
       - App__LocksDirectory=/app/state/locks

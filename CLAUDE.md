@@ -12,7 +12,7 @@ dotnet run --project src/AsanaClaudeAgent -- --once # single run
 
 ## Configuration
 
-Settings via `appsettings.json` or environment variables (e.g., `Asana__Token`, `Claude__MonorepoPath`).
+Settings via `appsettings.json` or environment variables (e.g., `Asana__Token`, `Claude__LocalRepoPath`).
 
 Three secrets required as env vars: `ASANA_TOKEN`, `ANTHROPIC_API_KEY`, `GH_TOKEN`.
 

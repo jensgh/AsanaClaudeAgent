@@ -27,7 +27,7 @@ Asana task ──> Classifier (claude -p) ──> Worker (claude -p) ──> Git
    cd src/AsanaClaudeAgent
    dotnet user-secrets set "Asana:Token" "your-asana-pat"
    dotnet user-secrets set "Asana:WorkspaceGid" "your-workspace-gid"
-   dotnet user-secrets set "Claude:MonorepoPath" "/path/to/your/monorepo"
+   dotnet user-secrets set "Claude:LocalRepoPath" "/path/to/your/repo"
    ```
 
    You can find your workspace GID in any Asana URL: `https://app.asana.com/0/<workspace_gid>/...`
@@ -88,7 +88,7 @@ docker run --rm \
   -e ANTHROPIC_API_KEY="your-anthropic-key" \
   -e GH_TOKEN="your-github-token" \
   -e Asana__WorkspaceGid="your-workspace-gid" \
-  -e Claude__MonorepoPath=/repo \
+  -e Claude__LocalRepoPath=/repo \
   -e Claude__DangerouslySkipPermissions=true \
   -e App__StateFilePath=/app/state/state.json \
   -v /path/to/your/monorepo:/repo \
@@ -120,7 +120,7 @@ All settings can be set in `appsettings.json` or overridden via environment vari
 
 | Setting | Default | Description |
 |---|---|---|
-| `Claude:MonorepoPath` | — | Path to the git repo Claude Code works on (required) |
+| `Claude:LocalRepoPath` | — | Path to the git repo Claude Code works on (required) |
 | `Claude:ClaudeBinaryPath` | `claude` | Path to the Claude Code CLI binary |
 | `Claude:ClassificationModel` | `sonnet` | Model for classification (lighter/faster) |
 | `Claude:WorkerModel` | `null` (default) | Model for implementation work |

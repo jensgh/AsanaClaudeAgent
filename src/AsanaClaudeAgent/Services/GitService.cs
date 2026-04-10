@@ -12,7 +12,7 @@ public class GitService : IGitService
 
     public GitService(IOptions<ClaudeSettings> settings, ILogger<GitService> logger)
     {
-        _repoPath = settings.Value.MonorepoPath;
+        _repoPath = settings.Value.LocalRepoPath;
         _logger = logger;
     }
 

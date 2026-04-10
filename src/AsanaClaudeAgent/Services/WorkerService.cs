@@ -33,7 +33,7 @@ public partial class WorkerService : IWorkerService
         var result = await _runner.RunAsync(new ClaudeProcessOptions
         {
             Prompt = prompt,
-            WorkingDirectory = _settings.MonorepoPath,
+            WorkingDirectory = _settings.LocalRepoPath,
             OutputFormat = "text",
             Model = _settings.WorkerModel,
             MaxCostUsd = _settings.MaxBudgetPerTask,

@@ -19,17 +19,17 @@ public static class StartupValidator
                         + "You can find it in the Asana URL: https://app.asana.com/0/<workspace_gid>/...");
         }
 
-        if (string.IsNullOrWhiteSpace(claude.MonorepoPath))
+        if (string.IsNullOrWhiteSpace(claude.LocalRepoPath))
         {
-            errors.Add("Monorepo path is not configured. Set 'Claude:MonorepoPath' in appsettings.json.");
+            errors.Add("Repository path is not configured. Set 'Claude:LocalRepoPath' in appsettings.json or via user secrets.");
         }
-        else if (!Directory.Exists(claude.MonorepoPath))
+        else if (!Directory.Exists(claude.LocalRepoPath))
         {
-            errors.Add($"Monorepo path does not exist: '{claude.MonorepoPath}'. Set 'Claude:MonorepoPath' to the correct path.");
+            errors.Add($"Repository path does not exist: '{claude.LocalRepoPath}'. Set 'Claude:LocalRepoPath' to the correct path.");
         }
-        else if (!Directory.Exists(Path.Combine(claude.MonorepoPath, ".git")))
+        else if (!Directory.Exists(Path.Combine(claude.LocalRepoPath, ".git")))
         {
-            errors.Add($"Monorepo path is not a git repository: '{claude.MonorepoPath}'. It must be the root of a git repo.");
+            errors.Add($"Repository path is not a git repository: '{claude.LocalRepoPath}'. It must be the root of a git repo.");
         }
 
         if (!IsToolAvailable(claude.ClaudeBinaryPath))

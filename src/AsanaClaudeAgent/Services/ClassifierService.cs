@@ -29,7 +29,7 @@ public class ClassifierService : IClassifierService
         var result = await _runner.RunAsync(new ClaudeProcessOptions
         {
             Prompt = prompt,
-            WorkingDirectory = _settings.MonorepoPath,
+            WorkingDirectory = _settings.LocalRepoPath,
             OutputFormat = "json",
             Model = _settings.ClassificationModel,
             DangerouslySkipPermissions = _settings.DangerouslySkipPermissions,
