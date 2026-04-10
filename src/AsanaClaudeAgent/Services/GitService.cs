@@ -29,7 +29,9 @@ public class GitService : IGitService
 
     public async Task<string> CreateBranchAsync(string branchName, CancellationToken ct)
     {
+        await RunGitAsync("checkout master", ct);
         await RunGitAsync("fetch origin master", ct);
+        await RunGitAsync("reset --hard origin/master", ct);
         await RunGitAsync($"checkout -b {branchName} origin/master", ct);
         _logger.LogInformation("Created and checked out branch {Branch}", branchName);
         return branchName;
