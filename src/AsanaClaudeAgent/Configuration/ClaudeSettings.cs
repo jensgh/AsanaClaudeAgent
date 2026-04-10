@@ -2,7 +2,7 @@ namespace AsanaClaudeAgent.Configuration;
 
 public class ClaudeSettings
 {
-    public string MonorepoPath { get; set; } = "/home/jens/repos/monorepo";
+    public string MonorepoPath { get; set; } = "";
     public string ClaudeBinaryPath { get; set; } = "claude";
     public string? ClassificationModel { get; set; } = "sonnet";
     public string? WorkerModel { get; set; }

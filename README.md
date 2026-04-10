@@ -27,6 +27,7 @@ Asana task ──> Classifier (claude -p) ──> Worker (claude -p) ──> Git
    cd src/AsanaClaudeAgent
    dotnet user-secrets set "Asana:Token" "your-asana-pat"
    dotnet user-secrets set "Asana:WorkspaceGid" "your-workspace-gid"
+   dotnet user-secrets set "Claude:MonorepoPath" "/path/to/your/monorepo"
    ```
 
    You can find your workspace GID in any Asana URL: `https://app.asana.com/0/<workspace_gid>/...`
@@ -37,16 +38,7 @@ Asana task ──> Classifier (claude -p) ──> Worker (claude -p) ──> Git
 
    **Visual Studio:** Right-click project > Properties > Debug > Environment variables > add `ANTHROPIC_API_KEY`
 
-4. Edit `src/AsanaClaudeAgent/appsettings.json` — set the monorepo path:
-   ```json
-   {
-     "Claude": {
-       "MonorepoPath": "/path/to/your/monorepo"
-     }
-   }
-   ```
-
-5. Run the project. Pass `--once` as a program argument for a single cycle, or omit it for continuous polling.
+4. Run the project. Pass `--once` as a program argument for a single cycle, or omit it for continuous polling.
 
 6. To test without actually running the worker, set `App:DryRun` to `true` in appsettings — this classifies tasks but skips implementation.
 
@@ -128,7 +120,7 @@ All settings can be set in `appsettings.json` or overridden via environment vari
 
 | Setting | Default | Description |
 |---|---|---|
-| `Claude:MonorepoPath` | `/home/jens/repos/monorepo` | Path to the git repo Claude Code works on |
+| `Claude:MonorepoPath` | — | Path to the git repo Claude Code works on (required) |
 | `Claude:ClaudeBinaryPath` | `claude` | Path to the Claude Code CLI binary |
 | `Claude:ClassificationModel` | `sonnet` | Model for classification (lighter/faster) |
 | `Claude:WorkerModel` | `null` (default) | Model for implementation work |
