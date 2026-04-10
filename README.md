@@ -21,46 +21,34 @@ Asana task ──> Classifier (claude -p) ──> Worker (claude -p) ──> Git
 
 1. Open `AsanaClaudeAgent.sln` in Rider or Visual Studio.
 
-2. Set environment variables in your run configuration:
+2. Store secrets using .NET user secrets (never in appsettings.json):
 
-   **Rider:** Run > Edit Configurations > Environment variables:
-   ```
-   ASANA_TOKEN=your-asana-pat
-   ANTHROPIC_API_KEY=your-anthropic-key
+   ```bash
+   cd src/AsanaClaudeAgent
+   dotnet user-secrets set "Asana:Token" "your-asana-pat"
+   dotnet user-secrets set "Asana:WorkspaceGid" "your-workspace-gid"
    ```
 
-   **Visual Studio:** Right-click project > Properties > Debug > Environment variables, or edit `launchSettings.json`:
+   You can find your workspace GID in any Asana URL: `https://app.asana.com/0/<workspace_gid>/...`
+
+3. Set `ANTHROPIC_API_KEY` in your IDE run configuration (this is read by the Claude Code CLI subprocess, not by our app, so it must be an environment variable):
+
+   **Rider:** Run > Edit Configurations > Environment variables > add `ANTHROPIC_API_KEY=your-key`
+
+   **Visual Studio:** Right-click project > Properties > Debug > Environment variables > add `ANTHROPIC_API_KEY`
+
+4. Edit `src/AsanaClaudeAgent/appsettings.json` — set the monorepo path:
    ```json
    {
-     "profiles": {
-       "AsanaClaudeAgent": {
-         "commandName": "Project",
-         "commandLineArgs": "--once",
-         "environmentVariables": {
-           "ASANA_TOKEN": "your-asana-pat",
-           "ANTHROPIC_API_KEY": "your-anthropic-key"
-         }
-       }
-     }
-   }
-   ```
-
-3. Edit `src/AsanaClaudeAgent/appsettings.json` — set at minimum:
-   ```json
-   {
-     "Asana": {
-       "WorkspaceGid": "your-workspace-gid"
-     },
      "Claude": {
        "MonorepoPath": "/path/to/your/monorepo"
      }
    }
    ```
-   You can find your workspace GID in any Asana URL: `https://app.asana.com/0/<workspace_gid>/...`
 
-4. Run the project. Pass `--once` as a program argument for a single cycle, or omit it for continuous polling.
+5. Run the project. Pass `--once` as a program argument for a single cycle, or omit it for continuous polling.
 
-5. To test without actually running the worker, set `App:DryRun` to `true` in appsettings — this classifies tasks but skips implementation.
+6. To test without actually running the worker, set `App:DryRun` to `true` in appsettings — this classifies tasks but skips implementation.
 
 ## Running from the command line
 
