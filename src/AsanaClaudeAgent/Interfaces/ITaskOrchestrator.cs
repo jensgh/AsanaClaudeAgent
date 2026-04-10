@@ -1,4 +1,4 @@
-namespace AsanaClaudeAgent.Services;
+namespace AsanaClaudeAgent.Interfaces;
 
 public interface ITaskOrchestrator
 {

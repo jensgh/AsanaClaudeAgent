@@ -1,5 +1,6 @@
 using AsanaClaudeAgent.Configuration;
 using AsanaClaudeAgent.Hosting;
+using AsanaClaudeAgent.Interfaces;
 using AsanaClaudeAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

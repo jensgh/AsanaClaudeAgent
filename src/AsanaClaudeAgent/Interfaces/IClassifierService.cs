@@ -1,6 +1,6 @@
 using AsanaClaudeAgent.Models;
 
-namespace AsanaClaudeAgent.Services;
+namespace AsanaClaudeAgent.Interfaces;
 
 public interface IClassifierService
 {
