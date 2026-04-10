@@ -3,7 +3,7 @@ namespace AsanaClaudeAgent.Configuration;
 public class AppSettings
 {
     public bool RunOnce { get; set; }
-    public int PollingIntervalMinutes { get; set; } = 5;
+    public int PollingIntervalMinutes { get; set; } = 30;
     public string StateFilePath { get; set; } = "state.json";
     public string LocksDirectory { get; set; } = "locks";
     public bool CommentOnAsana { get; set; } = true;

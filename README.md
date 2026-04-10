@@ -59,7 +59,7 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 # Single run
 dotnet run --project src/AsanaClaudeAgent -- --once
 
-# Continuous polling (every 5 minutes by default)
+# Continuous polling (every 30 minutes by default)
 dotnet run --project src/AsanaClaudeAgent
 ```
 
@@ -142,7 +142,7 @@ All settings can be set in `appsettings.json` or overridden via environment vari
 | Setting | Default | Description |
 |---|---|---|
 | `App:RunOnce` | `false` | Run a single cycle and exit (also set via `--once` flag) |
-| `App:PollingIntervalMinutes` | `5` | Minutes between polling cycles |
+| `App:PollingIntervalMinutes` | `30` | Minutes between polling cycles |
 | `App:CommentOnAsana` | `true` | Post comments on Asana tasks with results |
 | `App:FetchAllTasks` | `false` | Fetch all incomplete tasks (ignores last run time) |
 | `App:MaxRetries` | `1` | How many times to retry a failed task |
